@@ -20,59 +20,68 @@ struct WordCount {
     count: u32,
 }
 
-// struct TokenWrap<'a> {
-//     token: Token<'a>,
-// }
-
-// impl<'a> TokenWrap<'a> {
-//     fn new(token: &Token<'a>) -> TokenWrap<'a> {
-//         TokenWrap { token: *token }
-//     }
-// }
-
-// impl Debug for TokenWrap<'_> {
-//     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-//         f.debug_struct("TokenWrap")
-//             .field(("text"), &self.token.text)
-//             .field("detail", &self.token.detail)
-//             .finish()
-//     }
-// }
-
 #[derive(Debug)]
-struct TokenCount<'a> {
-    token: TokenWrap<'a>,
+struct TokenCount {
+    text: String,
+    detail: Vec<String>,
     count: u32,
 }
 
-// impl PartialEq for TokenWrap<'_> {
-//     fn eq(&self, other: &Self) -> bool {
-//         self.token.text == other.token.text && self.token.detail == other.token.detail
-//     }
-// }
-// impl Eq for TokenWrap<'_> {}
+impl TokenCount {
+    fn new(token: &Token) -> TokenCount {
+        TokenCount {
+            text: token.text.to_string(),
+            detail: token.detail.clone(),
+            count: 1,
+        }
+    }
+}
 
 fn main() -> LinderaResult<()> {
     let tokenizer = Tokenizer::new()?;
     let contents = get_raw_contents();
-
     let tokens = tokenizer.tokenize(contents.as_str())?;
-    let mut sorted_word_count = words_count(&tokens);
-    sorted_word_count.sort_by(|a, b| b.count.cmp(&a.count));
-    println!("{:?}", sorted_word_count);
+    let ignore_words: Vec<&str> = vec!["的", "レベル", "こと", "毎"];
+
+    // let mut sorted_word_count = words_count(&tokens);
+    // sorted_word_count.sort_by(|a, b| b.count.cmp(&a.count));
+    // println!("{:?}", sorted_word_count);
 
     let mut sorted_token_count = tokens_count(&tokens);
     sorted_token_count.sort_by(|a, b| b.count.cmp(&a.count));
-    println!("{:?}", sorted_token_count);
+    let mut frequent_noun: Vec<String> = Vec::new();
+    let mut count_nouns = 3;
+    for token_count in sorted_token_count.iter() {
+        println!("{:?}", token_count);
+        if token_count.detail[0] == "名詞"
+            && count_nouns > 0
+            && !ignore_words.contains(&token_count.text.as_str())
+        {
+            frequent_noun.push(token_count.text.clone());
+            count_nouns -= 1;
+        }
+    }
 
     for token in tokens {
         match token.detail[0].as_str() {
-            "接頭詞" => print!("{}", token.text.red()),
+            "接頭詞" => print!("{}", token.text.blue()),
             "助詞" => print!("{}", token.text.blue()),
-            "名詞" => print!("{}", token.text.yellow()),
+            "名詞" => {
+                if frequent_noun.contains(&token.text.to_string()) {
+                    if token.text == frequent_noun[0] {
+                        print!("{}", token.text.bright_yellow());
+                    } else if token.text == frequent_noun[1] {
+                        print!("{}", token.text.bright_red());
+                    } else {
+                        print!("{}", token.text.bright_green());
+                    }
+                } else {
+                    print!("{}", token.text.white())
+                }
+            }
             "動詞" => print!("{}", token.text.white()),
-            "助動詞" => print!("{}", token.text.cyan()),
-            "連体詞" => print!("{}", token.text.green()),
+            //"助動詞" => print!("{}", token.text.cyan()),
+            //"連体詞" => print!("{}", token.text.green()),
             _ => print!("{}", token.text.blue()),
         }
     }
@@ -115,21 +124,17 @@ fn words_count(tokens: &Vec<Token<'_>>) -> Vec<WordCount> {
     return word_counts;
 }
 
-fn tokens_count(tokens: &Vec<Token<'static>>) -> Vec<TokenCount<'static>> {
-    let mut token_counts: Vec<TokenCount<'static>> = Vec::new();
+fn tokens_count(tokens: &Vec<Token>) -> Vec<TokenCount> {
+    let mut token_counts: Vec<TokenCount> = Vec::new();
     for token in tokens {
-        match token_counts
-            .iter_mut()
-            .find(|e| e.token == TokenWrap::new(&token))
-        {
+        match token_counts.iter_mut().find(|e| {
+            e.text == TokenCount::new(&token).text && e.detail == TokenCount::new(&token).detail
+        }) {
             Some(x) => {
                 x.count += 1;
             }
             None => {
-                token_counts.push(TokenCount {
-                    token: TokenWrap::new(&token),
-                    count: 0,
-                });
+                token_counts.push(TokenCount::new(token));
             }
         }
     }
