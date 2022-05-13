@@ -7,3 +7,5 @@ edition = "2021"
 
 [dependencies]
 lindera = { version = "0.12.0", features = ["full"] }
+colored = "1.9"
+structopt = "0.3.13"
